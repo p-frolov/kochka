@@ -253,10 +253,11 @@ class ExerciseModel(QtCore.QAbstractTableModel):
 
 def main():
 
-    # to remove "QCoreApplication::exec: The event loop is already running"
+    # uncoment to remove
+    # "QCoreApplication::exec: The event loop is already running"
     # from console when debugging by ipdb
-    from PyQt4.QtCore import pyqtRemoveInputHook
-    pyqtRemoveInputHook()
+    # from PyQt4.QtCore import pyqtRemoveInputHook
+    # pyqtRemoveInputHook()
 
     app = QtGui.QApplication(sys.argv)
     form = KochkaApp()
