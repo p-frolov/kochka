@@ -23,6 +23,7 @@ from kochkalib import Set, Exercise, ExerciseTxtParser, save_exercises_to_file
 class KochkaApp(QtGui.QMainWindow, design.Ui_MainWindow):
     """Main Qt application"""
 
+    # todo: change working dir to program dir
     data_filename = 'data.txt'
 
     def __init__(self):
