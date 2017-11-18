@@ -13,8 +13,8 @@
 первую, рабочую версию было затрачено около недели.
 
 You be able to log your trainings with this program. You can log exercises such
-as deadlift, bench press, squat etc. Exercise consist of sets. Each set is
-weight, repetitions. Also you can set number of sets.
+as deadlift, bench press, squat etc. Exercise consists of sets. Each set is
+weight and number of repetitions. Also you can set number of sets.
 
 The program has been wrote for personal purpose. It not show Qt knowledge but is
 used as example of the author's Python code. The program has been wrote during
