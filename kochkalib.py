@@ -108,6 +108,7 @@ class ExerciseTxtParser:
         self.on_error = Event()
 
     def __iter__(self):
+        # из cookbook, может лучше просто итератор реализовать
         with open(self.filename) as f:
             for lineno, line in enumerate(f, start=1):
                 self.dispatch_line(line.rstrip(), lineno)
