@@ -4,20 +4,28 @@ Kochka Qt application
 Copyright 2017 Pavel Folov
 """
 
-__version__ = '0.1'
-__author__ = 'Pavel Frolov'
-
 import sys
+import os
 import os.path
+import logging
+import logging.config
 
 from PyQt4 import QtGui, QtCore
 
 import design
 from kochkalib import Set, Exercise, ExerciseTxtParser, save_exercises_to_file
+import loggingconf
 
+__version__ = '0.1'
+__author__ = 'Pavel Frolov'
+
+# todo: ругаться на выходе, если есть несохранённые данные
 # todo: i18n
 # todo: icon
 # todo: threading for load and save data
+
+audit = logging.getLogger('kochka.audit')
+logger = logging.getLogger('kochka.app')
 
 
 class KochkaApp(QtGui.QMainWindow, design.Ui_MainWindow):
@@ -80,8 +88,10 @@ class KochkaApp(QtGui.QMainWindow, design.Ui_MainWindow):
         if not rows:
             self._showError("No selected set")
             return
-        self.setModel.removeSetByIndex(rows[0].row())
-
+        set_index = rows[0].row()
+        audit.info('removing %s set: %s', set_index, self.setModel.sets[set_index])
+        self.setModel.removeSetByIndex(set_index)
+        
     def slot_loadData_clicked(self):
         self.exerciseModel.clear()
 
@@ -96,16 +106,20 @@ class KochkaApp(QtGui.QMainWindow, design.Ui_MainWindow):
             self.data_filename,
             self.exerciseModel.exercises
         )
+        audit.info('data saved')
 
     def slot_addSet_clicked(self):
-        self.setModel.addSet(Set(
+        set_ = Set(
             self.weight.text(),
             self.count.text(),
             self.setCount.text()
-        ))
+        )
+        self.setModel.addSet(set_)
+        audit.info('added set: %s', set_)
 
     def slot_clearSet_clicked(self):
         self.setModel.clear()
+        audit.info('sets cleared')
 
     def _check_exercise(self) -> bool:
         if not self.exerciseName.currentText():
@@ -119,11 +133,13 @@ class KochkaApp(QtGui.QMainWindow, design.Ui_MainWindow):
     def slot_addExercise_clicked(self):
         if not self._check_exercise():
             return
-        self.exerciseModel.addExercise(Exercise(
+        exercise = Exercise(
             self.exerciseDate.text(),
             self.exerciseName.currentText(),
             sets=self.setModel.sets
-        ))
+        )
+        self.exerciseModel.addExercise(exercise)
+        audit.info('added exercise: %s', exercise)
 
     def _showError(self, message):
         QtGui.QMessageBox(
@@ -253,6 +269,10 @@ class ExerciseModel(QtCore.QAbstractTableModel):
 
 
 def main():
+    os.makedirs('logs', exist_ok=True)
+    logging.config.dictConfig(loggingconf.config)
+
+    logger.info('app started')
 
     # uncoment to remove
     # "QCoreApplication::exec: The event loop is already running"
@@ -264,6 +284,7 @@ def main():
     form = KochkaApp()
     form.show()
     app.exec_()
+    logger.info('app stopped')
 
 
 if __name__ == '__main__':
