@@ -70,6 +70,6 @@ config = {
     # root and other modules
     'root': {
         'level': 'DEBUG',
-        'handlers': ['console', 'file', 'errors'],  # , 'file', 'errors', 'email'
+        'handlers': ['console', 'file', 'errors'],
     },
 }
