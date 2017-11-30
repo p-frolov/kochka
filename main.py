@@ -7,6 +7,8 @@ Copyright 2017 Pavel Folov
 import sys
 import os
 import os.path
+import re
+from functools import lru_cache
 import logging
 import logging.config
 
@@ -28,11 +30,21 @@ audit = logging.getLogger('kochka.audit')
 logger = logging.getLogger('kochka.app')
 
 
+@lru_cache()
+def replaced_webcolor(text, color):
+    """Заточено под подобное: `<font style="color:#a9a9a9;">Изменения</font>`"""
+    return re.sub(r'(.*)(color:#)([A-Fa-f0-9]{6})(;)(.*)',
+                  r'\g<1>\g<2>{}\g<4>\g<5>'.format(color), text)
+
+
 class KochkaApp(QtGui.QMainWindow, design.Ui_MainWindow):
     """Main Qt application"""
 
     # todo: change working dir to program dir
     data_filename = 'data.txt'
+
+    disabled_color = 'a9a9a9'
+    enabled_color = '008000'
 
     def __init__(self):
         super(self.__class__, self).__init__()
@@ -91,8 +103,10 @@ class KochkaApp(QtGui.QMainWindow, design.Ui_MainWindow):
         set_index = rows[0].row()
         audit.info('removing %s set: %s', set_index, self.setModel.sets[set_index])
         self.setModel.removeSetByIndex(set_index)
+        self.sets_manually_changed()
         
     def slot_loadData_clicked(self):
+        # todo: спросить, если есть изменения
         self.exerciseModel.clear()
 
         parser = ExerciseTxtParser(self.data_filename)
@@ -101,12 +115,16 @@ class KochkaApp(QtGui.QMainWindow, design.Ui_MainWindow):
         for exercise in parser:
             self.exerciseModel.addExercise(exercise)
 
+        self.exercises_manually_chanded(False)
+
     def slot_saveData_clicked(self):
         save_exercises_to_file(
             self.data_filename,
             self.exerciseModel.exercises
         )
         audit.info('data saved')
+        self.sets_manually_changed(False)
+        self.exercises_manually_chanded(False)
 
     def slot_addSet_clicked(self):
         set_ = Set(
@@ -116,10 +134,12 @@ class KochkaApp(QtGui.QMainWindow, design.Ui_MainWindow):
         )
         self.setModel.addSet(set_)
         audit.info('added set: %s', set_)
+        self.sets_manually_changed()
 
     def slot_clearSet_clicked(self):
         self.setModel.clear()
         audit.info('sets cleared')
+        self.sets_manually_changed(False)
 
     def _check_exercise(self) -> bool:
         if not self.exerciseName.currentText():
@@ -140,6 +160,20 @@ class KochkaApp(QtGui.QMainWindow, design.Ui_MainWindow):
         )
         self.exerciseModel.addExercise(exercise)
         audit.info('added exercise: %s', exercise)
+        self.exercises_manually_chanded()
+        self.sets_manually_changed(False)
+
+    def sets_manually_changed(self, is_changed=True):
+        self.lblSetsChanged.setText(replaced_webcolor(
+            self.lblSetsChanged.text(),
+            self.enabled_color if is_changed else self.disabled_color
+        ))
+
+    def exercises_manually_chanded(self, is_changed=True):
+        self.lblExercisesChanged.setText(replaced_webcolor(
+            self.lblExercisesChanged.text(),
+            self.enabled_color if is_changed else self.disabled_color
+        ))
 
     def _showError(self, message):
         QtGui.QMessageBox(
