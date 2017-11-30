@@ -50,7 +50,10 @@ class KochkaApp(QtGui.QMainWindow, design.Ui_MainWindow):
         super(self.__class__, self).__init__()
         self.setupUi(self)
 
-        self._buttonsConnects()
+        self._is_sets_changed = False
+        self._is_exercises_changed = False
+
+        self._buttons_connects()
 
         self.exerciseDate.setDate(QtCore.QDate.currentDate())
 
@@ -64,28 +67,59 @@ class KochkaApp(QtGui.QMainWindow, design.Ui_MainWindow):
         self.exerciseModel = ExerciseModel(self.exercisesTableView)
         self.exercisesTableView.setModel(self.exerciseModel)
 
-        self._initMenu()
-        self._appInit()
-        self.slot_loadData_clicked()
+        self._init_menu()
+        self._app_init()
 
-    def _buttonsConnects(self):
+    @property
+    def sets_manually_changed(self):
+        return self._is_sets_changed
+
+    @sets_manually_changed.setter
+    def sets_manually_changed(self, is_changed):
+        self._is_sets_changed = is_changed
+        self.lblSetsChanged.setText(replaced_webcolor(
+            self.lblSetsChanged.text(),
+            self.enabled_color if is_changed else self.disabled_color
+        ))
+
+    @property
+    def exercises_manually_chanded(self):
+        return self._is_exercises_changed
+
+    @exercises_manually_chanded.setter
+    def exercises_manually_chanded(self, is_changed):
+        self._is_exercises_changed = is_changed
+        self.lblExercisesChanged.setText(replaced_webcolor(
+            self.lblExercisesChanged.text(),
+            self.enabled_color if is_changed else self.disabled_color
+        ))
+
+    def _buttons_connects(self):
         self.addSetBtn.clicked.connect(self.slot_addSet_clicked)
         self.clearExerciseBtn.clicked.connect(self.slot_clearSet_clicked)
         self.addExerciseBtn.clicked.connect(self.slot_addExercise_clicked)
         self.loadDataBtn.clicked.connect(self.slot_loadData_clicked)
         self.saveDataBtn.clicked.connect(self.slot_saveData_clicked)
 
-    def _initMenu(self):
-        self.sets_table_menu = menu = QtGui.QMenu(self)
+    def _init_menu(self):
+        self.sets_table_menu = QtGui.QMenu(self)
         delete_action = QtGui.QAction(QtGui.QIcon.fromTheme('edit-delete'),
                                       'Удалить', self)
         delete_action.triggered.connect(self.slot_setsTabel_deleteRow)
         self.sets_table_menu.addAction(delete_action)
 
-    def _appInit(self):
+    def _app_init(self):
         if not os.path.exists(self.data_filename):
             with open(self.data_filename, 'w'):
                 pass
+        self._data_load()
+
+    def closeEvent(self, event :QtGui.QCloseEvent):
+        need_confirm = self.sets_manually_changed or self.exercises_manually_chanded
+        if need_confirm and not self._confirmed("Несохраненные данные будут утеряны, все равно закрыть?"):
+            event.ignore()
+        else:
+            event.accept()
 
     def slot_setsTable_customContextMenuRequested(self, pos):
         self.sets_table_menu.popup(
@@ -94,28 +128,21 @@ class KochkaApp(QtGui.QMainWindow, design.Ui_MainWindow):
     def slot_setsTabel_deleteRow(self):
         # http://doc.qt.io/qt-5/model-view-programming.html#inserting-and-removing-rows
         # https://evileg.com/en/post/76/
-        # import ipdb; ipdb.set_trace()
-
         rows = self.setsTableView.selectionModel().selectedRows()
         if not rows:
-            self._showError("No selected set")
+            self._show_error("No selected set")
             return
         set_index = rows[0].row()
         audit.info('removing %s set: %s', set_index, self.setModel.sets[set_index])
         self.setModel.removeSetByIndex(set_index)
-        self.sets_manually_changed()
+        self.sets_manually_changed = True
         
     def slot_loadData_clicked(self):
-        # todo: спросить, если есть изменения
-        self.exerciseModel.clear()
-
-        parser = ExerciseTxtParser(self.data_filename)
-        parser.on_error.append(lambda e: self._showError(e))
-
-        for exercise in parser:
-            self.exerciseModel.addExercise(exercise)
-
-        self.exercises_manually_chanded(False)
+        need_confirm = self.sets_manually_changed or self.exercises_manually_chanded
+        if need_confirm and not self._confirmed("Несохраненные данные будут утеряны, все равно загрузить?"):
+            return
+        self._data_load()
+        self.exercises_manually_chanded = False
 
     def slot_saveData_clicked(self):
         save_exercises_to_file(
@@ -123,8 +150,8 @@ class KochkaApp(QtGui.QMainWindow, design.Ui_MainWindow):
             self.exerciseModel.exercises
         )
         audit.info('data saved')
-        self.sets_manually_changed(False)
-        self.exercises_manually_chanded(False)
+        self.sets_manually_changed = False
+        self.exercises_manually_chanded = False
 
     def slot_addSet_clicked(self):
         set_ = Set(
@@ -134,19 +161,19 @@ class KochkaApp(QtGui.QMainWindow, design.Ui_MainWindow):
         )
         self.setModel.addSet(set_)
         audit.info('added set: %s', set_)
-        self.sets_manually_changed()
+        self.sets_manually_changed = True
 
     def slot_clearSet_clicked(self):
         self.setModel.clear()
         audit.info('sets cleared')
-        self.sets_manually_changed(False)
+        self.sets_manually_changed = False
 
     def _check_exercise(self) -> bool:
         if not self.exerciseName.currentText():
-            self._showError('Нет имени упражнения для добавления')
+            self._show_error('Нет имени упражнения для добавления')
             return False
         if not self.setModel.sets:
-            self._showError('Нет сетов для добавления')
+            self._show_error('Нет сетов для добавления')
             return False
         return True
 
@@ -160,22 +187,21 @@ class KochkaApp(QtGui.QMainWindow, design.Ui_MainWindow):
         )
         self.exerciseModel.addExercise(exercise)
         audit.info('added exercise: %s', exercise)
-        self.exercises_manually_chanded()
-        self.sets_manually_changed(False)
+        self.exercises_manually_chanded = True
+        self.sets_manually_changed = False
 
-    def sets_manually_changed(self, is_changed=True):
-        self.lblSetsChanged.setText(replaced_webcolor(
-            self.lblSetsChanged.text(),
-            self.enabled_color if is_changed else self.disabled_color
-        ))
+    def _data_load(self):
+        logger.info('data is loading...')
+        self.exerciseModel.clear()
 
-    def exercises_manually_chanded(self, is_changed=True):
-        self.lblExercisesChanged.setText(replaced_webcolor(
-            self.lblExercisesChanged.text(),
-            self.enabled_color if is_changed else self.disabled_color
-        ))
+        parser = ExerciseTxtParser(self.data_filename)
+        parser.on_error.append(lambda e: self._show_error(e))
 
-    def _showError(self, message):
+        for exercise in parser:
+            self.exerciseModel.addExercise(exercise)
+        logger.info('data has been loaded')
+
+    def _show_error(self, message):
         QtGui.QMessageBox(
             QtGui.QMessageBox.Warning,
             'Error',
@@ -183,13 +209,23 @@ class KochkaApp(QtGui.QMainWindow, design.Ui_MainWindow):
             QtGui.QMessageBox.Ok
         ).exec_()
 
-    def _showMessage(self, message, title='Information'):
+    def _show_message(self, message, title='Information'):
         QtGui.QMessageBox(
             QtGui.QMessageBox.Information,
             title,
             message,
             QtGui.QMessageBox.Ok
         ).exec_()
+
+    def _confirmed(self, question):
+        btn_clicked = QtGui.QMessageBox.question(
+            self,
+            'Подтверждение',
+            question,
+            QtGui.QMessageBox.Cancel | QtGui.QMessageBox.Ok,
+            QtGui.QMessageBox.Cancel
+        )
+        return btn_clicked == QtGui.QMessageBox.Ok
 
 
 class SetModel(QtCore.QAbstractTableModel):
@@ -308,9 +344,9 @@ def main():
 
     logger.info('app started')
 
-    # uncoment to remove
-    # "QCoreApplication::exec: The event loop is already running"
-    # from console when debugging by ipdb
+    # # uncoment to remove
+    # # "QCoreApplication::exec: The event loop is already running"
+    # # from console when debugging by ipdb
     # from PyQt4.QtCore import pyqtRemoveInputHook
     # pyqtRemoveInputHook()
 
