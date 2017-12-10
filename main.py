@@ -21,7 +21,7 @@ import loggingconf
 __version__ = '0.1'
 __author__ = 'Pavel Frolov'
 
-# todo: ругаться на выходе, если есть несохранённые данные
+# todo: фильтр по упражнениям
 # todo: i18n
 # todo: icon
 # todo: threading for load and save data
@@ -183,7 +183,8 @@ class KochkaApp(QtGui.QMainWindow, design.Ui_MainWindow):
         exercise = Exercise(
             self.exerciseDate.text(),
             self.exerciseName.currentText(),
-            sets=self.setModel.sets
+            sets=self.setModel.sets,
+            note=self.exerciseNote.text() or None
         )
         self.exerciseModel.addExercise(exercise)
         audit.info('added exercise: %s', exercise)
@@ -199,7 +200,8 @@ class KochkaApp(QtGui.QMainWindow, design.Ui_MainWindow):
 
         for exercise in parser:
             self.exerciseModel.addExercise(exercise)
-        logger.info('data has been loaded')
+        logger.info('data has been loaded: trainings(%d)',
+                    self.exerciseModel.rowCount())
 
     def _show_error(self, message):
         QtGui.QMessageBox(
@@ -292,6 +294,7 @@ class SetModel(QtCore.QAbstractTableModel):
 
 class ExerciseModel(QtCore.QAbstractTableModel):
     """Model for Exercise TableView"""
+
     def __init__(self, parent):
         QtCore.QAbstractTableModel.__init__(self)
         self.gui = parent
@@ -322,7 +325,9 @@ class ExerciseModel(QtCore.QAbstractTableModel):
         if role == QtCore.Qt.DisplayRole:
             exercise = self.exercises[index.row()]
             col = index.column()
-            if col == 2:
+            if col == 1:
+                return exercise.name_with_note
+            elif col == 2:
                 return exercise.sets_str
             elif col == 3:
                 return exercise.total_weight

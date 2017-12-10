@@ -159,6 +159,13 @@
          </widget>
         </item>
         <item>
+         <widget class="QLineEdit" name="exerciseNote">
+          <property name="placeholderText">
+           <string>note</string>
+          </property>
+         </widget>
+        </item>
+        <item>
          <widget class="QPushButton" name="addExerciseBtn">
           <property name="text">
            <string>Записать в журнал</string>

@@ -6,6 +6,7 @@ Copyright 2017 Pavel Folov
 
 import re
 from enum import Enum
+from textwrap import shorten
 
 from patterns import Event
 from oslib import filebackup
@@ -39,16 +40,17 @@ class Set:
 class Exercise:
     """Упражнение из подходов"""
 
-    __slots__ = ['date', 'name', 'sets']
+    __slots__ = ['date', 'name', 'sets', 'note']
 
     # to access by index
     # getattr(exercise, Exercise.ATTRS[col])
     ATTRS = __slots__
 
-    def __init__(self, date=None, name=None, sets=None):
+    def __init__(self, date=None, name=None, sets=None, note=None):
         self.date = date
         self.name = name
         self.sets = sets or []
+        self.note = note
 
     def add_set(self, set_: Set):
         self.sets.append(set_)
@@ -62,11 +64,25 @@ class Exercise:
         return ' '.join('[{}]'.format(str(s)) for s in self.sets)
 
     def str_to_save(self) -> str:
-        return '\n'.join([
-            self.date,
-            self.name,
-            '\n'.join('{}'.format(str(s)) for s in self.sets)
-        ])
+        record_list = [self.date, self.name]
+        if self.note:
+            record_list.append(self.note_to_save)
+        record_list.append('\n'.join('{}'.format(str(s)) for s in self.sets))
+        return '\n'.join(record_list)
+
+    @property
+    def note_to_save(self):
+        return '# {}'.format(self.note)
+
+    @property
+    def name_with_note(self):
+        if self.note is None:
+            return self.name
+        else:
+            return '{} ({})'.format(
+                self.name,
+                shorten(self.note, width=20, placeholder='...')
+            )
 
     def __str__(self):
         return 'date({0.date}), name({0.name}), sets({0.sets_str})'.format(
@@ -77,8 +93,9 @@ class ParserState(Enum):
     START = 0
     DATE_GOT = 1
     NAME_GOT = 2
-    SETS_GETTING = 3
-    DONE = 4
+    NOTE_GOT = 3
+    SETS_GETTING = 4
+    DONE = 5
 
 
 class ExerciseTxtParser:
@@ -87,6 +104,7 @@ class ExerciseTxtParser:
 
     2017.01.13
     жим
+    #травма, поясница
     35 5
     45 10 х5
     50 6 х2
@@ -130,6 +148,10 @@ class ExerciseTxtParser:
         return self.state is ParserState.NAME_GOT
 
     @property
+    def is_note_got(self):
+        return self.state is ParserState.NOTE_GOT
+
+    @property
     def is_sets_getting(self):
         return self.state is ParserState.SETS_GETTING
 
@@ -137,6 +159,7 @@ class ExerciseTxtParser:
     def is_done(self):
         return self.state is ParserState.DONE
 
+    # todo: избавиться от условий (конечный автомат, или еще чего)
     def dispatch_line(self, line: str, lineno: int):
         done_cond = (not line) and self.is_sets_getting
         if done_cond:
@@ -154,7 +177,11 @@ class ExerciseTxtParser:
             self.currentExercise.name = line
             self.state = ParserState.NAME_GOT
             return
-        elif self.is_name_got or self.is_sets_getting:
+        elif self.is_name_got and line.startswith('#'):
+            self.currentExercise.note = line.lstrip('# ')
+            self.state = ParserState.NOTE_GOT
+            return
+        elif self.is_name_got or self.is_note_got or self.is_sets_getting:
             match = self.set_pattern.match(line)
             if match:
                 self.currentExercise.sets.append(
